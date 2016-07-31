@@ -2,14 +2,23 @@
 
 use Illuminate\Http\Request;
 use Illuminate\Routing\Controller as BaseController;
-use Barryvdh\TranslationManager\Models\Translation;
 use Illuminate\Support\Collection;
+use Barryvdh\TranslationManager\Models\Translation;
 
 class Controller extends BaseController
 {
-    /** @var \Barryvdh\TranslationManager\Manager  */
+    /**
+     * Translation manager (that's us ;).
+     *
+     * @var \Barryvdh\TranslationManager\Manager
+     */
     protected $manager;
 
+    /**
+     * Controller constructor.
+     *
+     * @param \Barryvdh\TranslationManager\Manager $manager
+     */
     public function __construct(Manager $manager)
     {
         $this->manager = $manager;
@@ -17,29 +26,32 @@ class Controller extends BaseController
 
     public function getIndex($group = null)
     {
-        $locales = $this->loadLocales();
-        $groups = Translation::groupBy('group');
+        $locales        = $this->loadLocales();
+        $groups         = Translation::groupBy('group');
         $excludedGroups = $this->manager->getConfig('exclude_groups');
-        if($excludedGroups){
+
+        if ($excludedGroups) {
             $groups->whereNotIn('group', $excludedGroups);
         }
 
         $groups = $groups->lists('group', 'group');
+
         if ($groups instanceof Collection) {
             $groups = $groups->all();
         }
-        $groups = [''=>'Choose a group'] + $groups;
-        $numChanged = Translation::where('group', $group)->where('status', Translation::STATUS_CHANGED)->count();
 
+        $groups     = ['' => 'Choose a group'] + $groups;
+        $numChanged = Translation::where('group', $group)->where('status', Translation::STATUS_CHANGED)->count();
 
         $allTranslations = Translation::where('group', $group)->orderBy('key', 'asc')->get();
         $numTranslations = count($allTranslations);
-        $translations = [];
-        foreach($allTranslations as $translation){
+        $translations    = [];
+
+        foreach ($allTranslations as $translation) {
             $translations[$translation->key][$translation->locale] = $translation;
         }
 
-         return view('translation-manager::index')
+        return view('translation-manager::index')
             ->with('translations', $translations)
             ->with('locales', $locales)
             ->with('groups', $groups)
@@ -53,7 +65,7 @@ class Controller extends BaseController
     public function getView($group, $sub_group = null)
     {
         if ($sub_group) {
-            return $this->getIndex($group.'/'.$sub_group);
+            return $this->getIndex($group . '/' . $sub_group);
         }
 
         return $this->getIndex($group);
@@ -63,10 +75,13 @@ class Controller extends BaseController
     {
         //Set the default locale as the first one.
         $locales = Translation::groupBy('locale')->lists('locale');
+
         if ($locales instanceof Collection) {
             $locales = $locales->all();
         }
+
         $locales = array_merge([config('app.locale')], $locales);
+
         return array_unique($locales);
     }
 
@@ -78,38 +93,43 @@ class Controller extends BaseController
             $group = $group . "/" . $sub_group;
         }
 
-        foreach($keys as $key){
+        foreach ($keys as $key) {
             $key = trim($key);
-            if($group && $key){
+            if ($group && $key) {
                 $this->manager->missingKey('*', $group, $key);
             }
         }
+
         return redirect()->back();
     }
 
     public function postEdit(Request $request, $group, $sub_group = null)
     {
-        if(!in_array($group, $this->manager->getConfig('exclude_groups'))) {
-            $name = $request->get('name');
+        if (!in_array($group, $this->manager->getConfig('exclude_groups'))) {
+            $name  = $request->get('name');
             $value = $request->get('value');
 
             list($locale, $key) = explode('|', $name, 2);
-            $translation = Translation::firstOrNew([
+            $translation         = Translation::firstOrNew([
                 'locale' => $locale,
-                'group' => $sub_group ? $group . "/" . $sub_group: $group,
-                'key' => $key,
+                'group'  => $sub_group ? $group . "/" . $sub_group : $group,
+                'key'    => $key,
             ]);
-            $translation->value = (string) $value ?: null;
+            $translation->value  = (string)$value ?: null;
             $translation->status = Translation::STATUS_CHANGED;
             $translation->save();
-            return array('status' => 'ok');
+
+            return ['status' => 'ok'];
         }
     }
 
     public function postDelete($group, $key, $sub_group = null)
     {
-        if(!in_array($group, $this->manager->getConfig('exclude_groups')) && $this->manager->getConfig('delete_enabled')) {
+        if (!in_array($group,
+                $this->manager->getConfig('exclude_groups')) && $this->manager->getConfig('delete_enabled')
+        ) {
             Translation::where('group', $group)->where('key', $key)->delete();
+
             return ['status' => 'ok'];
         }
     }
@@ -126,13 +146,13 @@ class Controller extends BaseController
     {
         $numFound = $this->manager->findTranslations();
 
-        return ['status' => 'ok', 'counter' => (int) $numFound];
+        return ['status' => 'ok', 'counter' => (int)$numFound];
     }
 
     public function postPublish($group, $sub_group = null)
     {
         if ($sub_group) {
-            $this->manager->exportTranslations($group.'/'.$sub_group);
+            $this->manager->exportTranslations($group . '/' . $sub_group);
         } else {
             $this->manager->exportTranslations($group);
         }

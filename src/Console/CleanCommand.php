@@ -1,10 +1,12 @@
-<?php namespace Barryvdh\TranslationManager\Console;
+<?php
+
+namespace Barryvdh\TranslationManager\Console;
 
 use Barryvdh\TranslationManager\Manager;
 use Illuminate\Console\Command;
 
-class CleanCommand extends Command {
-
+class CleanCommand extends Command
+{
     /**
      * The console command name.
      *
@@ -19,7 +21,7 @@ class CleanCommand extends Command {
      */
     protected $description = 'Clean empty translations';
 
-    /** @var \Barryvdh\TranslationManager\Manager  */
+    /** @var \Barryvdh\TranslationManager\Manager */
     protected $manager;
 
     public function __construct(Manager $manager)
@@ -38,5 +40,4 @@ class CleanCommand extends Command {
         $this->manager->cleanTranslations();
         $this->info("Done cleaning translations");
     }
-
 }
