@@ -2,8 +2,8 @@
 
 namespace Barryvdh\TranslationManager;
 
+use Illuminate\Routing\Router;
 use Illuminate\Support\ServiceProvider;
-use Illuminate\Contracts\Routing\Router;
 
 class ManagerServiceProvider extends ServiceProvider
 {
@@ -61,7 +61,7 @@ class ManagerServiceProvider extends ServiceProvider
     /**
      * Bootstrap the application events.
      *
-     * @param  \Illuminate\Contracts\Routing\Router $router
+     * @param  \Illuminate\Routing\Router $router
      *
      * @return void
      */
