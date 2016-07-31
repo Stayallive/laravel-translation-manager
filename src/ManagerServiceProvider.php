@@ -82,9 +82,15 @@ class ManagerServiceProvider extends ServiceProvider
 
         $config['namespace'] = 'Barryvdh\TranslationManager';
 
-        $router->group($config, function ($router) {
-            $router->get('view/{group}', 'Controller@getView');
-            $router->controller('/', 'Controller');
+        $router->group($config, function (Router $router) {
+            $router->get('view/{group?}/{subgroup?}', 'Controller@getView');
+            $router->post('add/{group}/{subgroup?}', 'Controller@postAdd');
+            $router->post('edit/{group}/{subgroup?}', 'Controller@postEdit');
+            $router->post('publish/{group}/{subgroup?}', 'Controller@postPublish');
+            $router->post('delete/{group}/{key}/{subgroup?}', 'Controller@postDelete');
+            $router->post('import', 'Controller@postImport');
+            $router->post('find', 'Controller@postFind');
+            $router->get('/', 'Controller@getIndex');
         });
     }
 
