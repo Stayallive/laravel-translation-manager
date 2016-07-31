@@ -24,7 +24,7 @@ class Translation extends Model
     protected $table      = 'ltm_translations';
     protected $guarded    = ['id', 'created_at', 'updated_at'];
 
-    public function __construct(array $attributes)
+    public function __construct(array $attributes = [])
     {
         parent::__construct($attributes);
 
