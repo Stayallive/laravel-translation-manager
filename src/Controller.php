@@ -44,8 +44,9 @@ class Controller extends BaseController
             ->with('locales', $locales)
             ->with('groups', $groups)
             ->with('group', $group)
-            ->with('numTranslations', $numTranslations)
             ->with('numChanged', $numChanged)
+            ->with('numTranslations', $numTranslations)
+            ->with('config', $this->manager->getConfig())
             ->with('editUrl', action('\Barryvdh\TranslationManager\Controller@postEdit', [$group]))
             ->with('deleteEnabled', $this->manager->getConfig('delete_enabled'));
     }
@@ -112,10 +113,12 @@ class Controller extends BaseController
 
     public function postImport(Request $request)
     {
-        $replace = $request->get('replace', false);
-        $counter = $this->manager->importTranslations($replace);
+        if ($this->manager->getConfig('import_enabled')) {
+            $replace = $request->get('replace', false);
+            $counter = $this->manager->importTranslations($replace);
 
-        return ['status' => 'ok', 'counter' => $counter];
+            return ['status' => 'ok', 'counter' => $counter];
+        }
     }
 
     public function postFind()

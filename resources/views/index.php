@@ -16,9 +16,79 @@
         a.status-1{
             font-weight: bold;
         }
+
+        .trans-actions:not(.top-flow) > a[href] {
+            display: none;
+        }
+
+        .trans-actions.top-flow {
+            -webkit-transition: all 0.1s;
+            -moz-transition: all 0.1s;
+            -ms-transition: all 0.1s;
+            -o-transition: all 0.1s;
+            transition: all 0.1s;
+
+        <?php if (array_get($config, 'menu_position') === 'bottom') {
+            echo 'bottom: 0;box-shadow: 0 -1px 0 rgba(0,0,0,.23);';
+        } else {
+            echo 'top: 0;box-shadow: 0 1px 0 rgba(0,0,0,.23);';
+        } ?>
+            width: 80%;
+            z-index: 1;
+            padding: 10px;
+            display: block;
+            position: fixed;
+            background: #fff;
+
+
+        }
+
+        <?php if (array_get($config, 'menu_position') === 'bottom') {
+            echo '.table {margin-bottom: 80px; }';
+        } ?>
+
+        .trans-actions.top-flow form {
+            float: right;
+        }
+
+        table tr:hover {
+            background: #eee;
+        }
+        table tr td  + table tr:hover td {
+            border-color: #f00;
+        }
     </style>
     <script>
         jQuery(document).ready(function($){
+
+            var scrolling = null;
+            jQuery('[data-scroll-to], a[href^="#"]').on('click', function (e) {
+                var target = jQuery(this).data('scroll-to') ? jQuery(this).data('scroll-to') : jQuery(this).attr('href');
+
+                if (target && target.length > 1 && jQuery(target) && jQuery(target).length) {
+                    e.preventDefault();
+                    e.stopPropagation();
+
+                    if (scrolling != null)
+                        scrolling.stop();
+
+                    scrolling = jQuery('html, body').animate({
+                        scrollTop: (parseInt(jQuery(target).offset().top) - 200)
+                    }, 100);
+
+                    jQuery("html, body").bind("scroll mousedown DOMMouseScroll mousewheel", function () {
+                        jQuery('html, body').stop();
+                    });
+                }
+            });
+
+            jQuery('[href="#new-translation"]').click(function () {
+                jQuery('#new-translation [name="keys"]').focus();
+            });
+
+            $(window).on('scroll', function () {
+                $('.trans-actions').toggleClass('top-flow', (window.pageYOffset || document.documentElement.scrollTop) > 100);
+            }).trigger('scroll');
 
             $.ajaxSetup({
                 beforeSend: function(xhr, settings) {
@@ -50,24 +120,33 @@
             });
 
             $("a.delete-key").click(function(event){
-              event.preventDefault();
-              var row = $(this).closest('tr');
-              var url = $(this).attr('href');
-              var id = row.attr('id');
-              $.post( url, {id: id}, function(){
-                  row.remove();
-              } );
+                event.preventDefault();
+
+                var elem = $(this);
+
+                if (confirm(elem.attr('data-confirm-msg')) == true) {
+                    var row = $(this).closest('tr');
+                    var url = $(this).attr('href');
+                    var id  = row.attr('id');
+                    $.post(url, {id: id}, function () {
+                        row.remove();
+                    });
+                }
             });
 
-            $('.form-import').on('ajax:success', function (e, data) {
-                $('div.success-import strong.counter').text(data.counter);
-                $('div.success-import').slideDown();
-            });
+            <?php if(array_get($config, 'import_enabled', true)): ?>
+                $('.form-import').on('ajax:success', function (e, data) {
+                    $('div.success-import strong.counter').text(data.counter);
+                    $('div.success-import').slideDown();
+                });
+            <?php endif; ?>
 
-            $('.form-find').on('ajax:success', function (e, data) {
-                $('div.success-find strong.counter').text(data.counter);
-                $('div.success-find').slideDown();
-            });
+            <?php if(array_get($config, 'find_enabled', true)): ?>
+                $('.form-find').on('ajax:success', function (e, data) {
+                    $('div.success-find strong.counter').text(data.counter);
+                    $('div.success-find').slideDown();
+                });
+            <?php endif; ?>
 
             $('.form-publish').on('ajax:success', function (e, data) {
                 $('div.success-publish').slideDown();
@@ -95,28 +174,34 @@
         </div>
     <?php endif; ?>
     <p>
-        <?php if(!isset($group)) : ?>
-        <form class="form-inline form-import" method="POST" action="<?= action('\Barryvdh\TranslationManager\Controller@postImport') ?>" data-remote="true" role="form">
-            <input type="hidden" name="_token" value="<?php echo csrf_token(); ?>">
-            <select name="replace" class="form-control">
-                <option value="0">Append new translations</option>
-                <option value="1">Replace existing translations</option>
-            </select>
-            <button type="submit" class="btn btn-success"  data-disable-with="Loading..">Import groups</button>
-        </form>
-        <form class="form-inline form-find" method="POST" action="<?= action('\Barryvdh\TranslationManager\Controller@postFind') ?>" data-remote="true" role="form" data-confirm="Are you sure you want to scan you app folder? All found translation keys will be added to the database.">
-            <input type="hidden" name="_token" value="<?php echo csrf_token(); ?>">
-            <p></p>
-            <button type="submit" class="btn btn-info" data-disable-with="Searching.." >Find translations in files</button>
-        </form>
-        <?php endif; ?>
-        <?php if(isset($group)) : ?>
+        <?php if(!isset($group) && array_get($config, 'import_enabled', true)) : ?>
+    <form class="form-inline form-import" method="POST" action="<?= action('\Barryvdh\TranslationManager\Controller@postImport') ?>" data-remote="true" role="form">
+        <input type="hidden" name="_token" value="<?php echo csrf_token(); ?>">
+        <select name="replace" class="form-control">
+            <option value="0">Append new translations</option>
+            <option value="1">Replace existing translations</option>
+        </select>
+        <button type="submit" class="btn btn-success"  data-disable-with="Loading..">Import groups</button>
+    </form>
+    <?php if(array_get($config, 'find_enabled', true)): ?>
+    <form class="form-inline form-find" method="POST" action="<?= action('\Barryvdh\TranslationManager\Controller@postFind') ?>" data-remote="true" role="form" data-confirm="Are you sure you want to scan you app folder? All found translation keys will be added to the database.">
+        <input type="hidden" name="_token" value="<?php echo csrf_token(); ?>">
+        <p></p>
+        <button type="submit" class="btn btn-info" data-disable-with="Searching.." >Find translations in files</button>
+    </form>
+    <?php endif; ?>
+<?php endif; ?>
+    <?php if(isset($group)) : ?>
+        <div class="trans-actions">
+            <a class="btn btn-default" href="#new-translation">+ New translation</a>
+
             <form class="form-inline form-publish" method="POST" action="<?= action('\Barryvdh\TranslationManager\Controller@postPublish', $group) ?>" data-remote="true" role="form" data-confirm="Are you sure you want to publish the translations group '<?= $group ?>? This will overwrite existing language files.">
                 <input type="hidden" name="_token" value="<?php echo csrf_token(); ?>">
                 <button type="submit" class="btn btn-info" data-disable-with="Publishing.." >Publish translations</button>
                 <a href="<?= action('\Barryvdh\TranslationManager\Controller@getIndex') ?>" class="btn btn-default">Back</a>
             </form>
-        <?php endif; ?>
+        </div>
+    <?php endif; ?>
     </p>
     <form role="form">
         <input type="hidden" name="_token" value="<?php echo csrf_token(); ?>">
@@ -129,48 +214,50 @@
         </div>
     </form>
     <?php if($group): ?>
-        <form action="<?= action('\Barryvdh\TranslationManager\Controller@postAdd', array($group)) ?>" method="POST"  role="form">
-            <input type="hidden" name="_token" value="<?php echo csrf_token(); ?>">
-            <textarea class="form-control" rows="3" name="keys" placeholder="Add 1 key per line, without the group prefix"></textarea>
-            <p></p>
-            <input type="submit" value="Add keys" class="btn btn-primary">
-        </form>
+        <?php if(array_get($config, 'creating_enabled', true)): ?>
+            <form action="<?= action('\Barryvdh\TranslationManager\Controller@postAdd', array($group)) ?>" method="POST" role="form" id="new-translation">
+                <input type="hidden" name="_token" value="<?php echo csrf_token(); ?>">
+                <textarea class="form-control" rows="3" name="keys" placeholder="Add 1 key per line, without the group prefix"></textarea>
+                <p></p>
+                <input type="submit" value="Add keys" class="btn btn-primary">
+            </form>
+        <?php endif ?>
         <hr>
-    <h4>Total: <?= $numTranslations ?>, changed: <?= $numChanged ?></h4>
-    <table class="table">
-        <thead>
-        <tr>
-            <th width="15%">Key</th>
-            <?php foreach($locales as $locale): ?>
-                <th><?= $locale ?></th>
-            <?php endforeach; ?>
-            <?php if($deleteEnabled): ?>
-                <th>&nbsp;</th>
-            <?php endif; ?>
-        </tr>
-        </thead>
-        <tbody>
-
-        <?php foreach($translations as $key => $translation): ?>
-            <tr id="<?= $key ?>">
-                <td><?= $key ?></td>
+        <h4>Total: <?= $numTranslations ?>, changed: <?= $numChanged ?></h4>
+        <table class="table">
+            <thead>
+            <tr>
+                <th width="15%">Key</th>
                 <?php foreach($locales as $locale): ?>
-                    <?php $t = isset($translation[$locale]) ? $translation[$locale] : null?>
-
-                    <td>
-                        <a href="#edit" class="editable status-<?= $t ? $t->status : 0 ?> locale-<?= $locale ?>" data-locale="<?= $locale ?>" data-name="<?= $locale . "|" . $key ?>" id="username" data-type="textarea" data-pk="<?= $t ? $t->id : 0 ?>" data-url="<?= $editUrl ?>" data-title="Enter translation"><?= $t ? htmlentities($t->value, ENT_QUOTES, 'UTF-8', false) : '' ?></a>
-                    </td>
+                    <th><?= $locale ?></th>
                 <?php endforeach; ?>
                 <?php if($deleteEnabled): ?>
-                    <td>
-                        <a href="<?= action('\Barryvdh\TranslationManager\Controller@postDelete', [$group, $key]) ?>" class="delete-key" data-confirm="Are you sure you want to delete the translations for '<?= $key ?>?"><span class="glyphicon glyphicon-trash"></span></a>
-                    </td>
+                    <th>&nbsp;</th>
                 <?php endif; ?>
             </tr>
-        <?php endforeach; ?>
+            </thead>
+            <tbody>
 
-        </tbody>
-    </table>
+            <?php foreach($translations as $key => $translation): ?>
+                <tr id="<?= $key ?>">
+                    <td><?= $key ?></td>
+                    <?php foreach($locales as $locale): ?>
+                        <?php $t = isset($translation[$locale]) ? $translation[$locale] : null?>
+
+                        <td>
+                            <a href="#edit" class="editable status-<?= $t ? $t->status : 0 ?> locale-<?= $locale ?>" data-locale="<?= $locale ?>" data-name="<?= $locale . "|" . $key ?>" id="username" data-type="textarea" data-pk="<?= $t ? $t->id : 0 ?>" data-url="<?= $editUrl ?>" data-title="Enter translation"><?= $t ? htmlentities($t->value, ENT_QUOTES, 'UTF-8', false) : '' ?></a>
+                        </td>
+                    <?php endforeach; ?>
+                    <?php if($deleteEnabled): ?>
+                        <td>
+                            <a href="<?= action('\Barryvdh\TranslationManager\Controller@postDelete', [$group, $key]) ?>" class="delete-key" data-confirm-msg="Are you sure you want to delete the translations for '<?= $key ?>?"><span class="glyphicon glyphicon-trash"></span></a>
+                        </td>
+                    <?php endif; ?>
+                </tr>
+            <?php endforeach; ?>
+
+            </tbody>
+        </table>
     <?php else: ?>
         <p>Choose a group to display the group translations. If no groups are visible, make sure you have run the migrations and imported the translations.</p>
 
