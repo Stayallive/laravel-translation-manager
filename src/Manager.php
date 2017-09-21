@@ -28,7 +28,7 @@ class Manager{
 
     public function missingKey($namespace, $group, $key)
     {
-        if(!in_array($group, $this->config['exclude_groups'])) {
+        if(!in_array($group, $this->config['exclude_groups']) && $this->getConfig('creating_enabled')) {
             Translation::firstOrCreate(array(
                 'locale' => $this->app['config']['app.locale'],
                 'group' => $group,
@@ -39,102 +39,107 @@ class Manager{
 
     public function importTranslations($replace = false)
     {
-        $counter = 0;
-        foreach($this->files->directories($this->app['path.lang']) as $langPath){
-            $locale = basename($langPath);
+        if ($this->getConfig('import_enabled')) {
+            $counter = 0;
+            foreach ($this->files->directories($this->app['path.lang']) as $langPath) {
+                $locale = basename($langPath);
 
-            foreach($this->files->allfiles($langPath) as $file) {
+                foreach ($this->files->allfiles($langPath) as $file) {
 
-                $info = pathinfo($file);
-                $group = $info['filename'];
+                    $info  = pathinfo($file);
+                    $group = $info['filename'];
 
-                if(in_array($group, $this->config['exclude_groups'])) {
-                    continue;
-                }
+                    if (in_array($group, $this->config['exclude_groups'])) {
+                        continue;
+                    }
 
-                $subLangPath = str_replace($langPath . DIRECTORY_SEPARATOR, "", $info['dirname']);
-                if ($subLangPath != $langPath) {
-                    $group = $subLangPath . "/" . $group;
-                }
+                    $subLangPath = str_replace($langPath . DIRECTORY_SEPARATOR, "", $info['dirname']);
+                    if ($subLangPath != $langPath) {
+                        $group = $subLangPath . "/" . $group;
+                    }
 
-                $translations = \Lang::getLoader()->load($locale, $group);
-                if ($translations && is_array($translations)) {
-                    foreach(array_dot($translations) as $key => $value){
-                        // process only string values
-                        if(is_array($value)){
-                            continue;
+                    $translations = \Lang::getLoader()->load($locale, $group);
+                    if ($translations && is_array($translations)) {
+                        foreach (array_dot($translations) as $key => $value) {
+                            // process only string values
+                            if (is_array($value)) {
+                                continue;
+                            }
+                            $value       = (string)$value;
+                            $translation = Translation::firstOrNew([
+                                'locale' => $locale,
+                                'group'  => $group,
+                                'key'    => $key,
+                            ]);
+
+                            // Check if the database is different then the files
+                            $newStatus = $translation->value === $value ? Translation::STATUS_SAVED : Translation::STATUS_CHANGED;
+                            if ($newStatus !== (int)$translation->status) {
+                                $translation->status = $newStatus;
+                            }
+
+                            // Only replace when empty, or explicitly told so
+                            if ($replace || !$translation->value) {
+                                $translation->value = $value;
+                            }
+
+                            $translation->save();
+
+                            $counter++;
                         }
-                        $value = (string) $value;
-                        $translation = Translation::firstOrNew(array(
-                            'locale' => $locale,
-                            'group' => $group,
-                            'key' => $key,
-                        ));
-
-                        // Check if the database is different then the files
-                        $newStatus = $translation->value === $value ? Translation::STATUS_SAVED : Translation::STATUS_CHANGED;
-                        if($newStatus !== (int) $translation->status){
-                            $translation->status = $newStatus;
-                        }
-
-                        // Only replace when empty, or explicitly told so
-                        if($replace || !$translation->value){
-                            $translation->value = $value;
-                        }
-
-                        $translation->save();
-
-                        $counter++;
                     }
                 }
             }
+
+            return $counter;
         }
-        return $counter;
     }
 
     public function findTranslations($path = null)
     {
-        $path = $path ?: base_path();
-        $keys = array();
-        $functions =  array('trans', 'trans_choice', 'Lang::get', 'Lang::choice', 'Lang::trans', 'Lang::transChoice', '@lang', '@choice', '__');
-        $pattern =                              // See http://regexr.com/392hu
-            "[^\w|>]".                          // Must not have an alphanum or _ or > before real method
-            "(".implode('|', $functions) .")".  // Must start with one of the functions
-            "\(".                               // Match opening parenthese
-            "[\'\"]".                           // Match " or '
-            "(".                                // Start a new group to match:
-                "[a-zA-Z0-9_-]+".               // Must start with group
-                "([.][^\1)]+)+".                // Be followed by one or more items/keys
-            ")".                                // Close group
-            "[\'\"]".                           // Closing quote
-            "[\),]";                            // Close parentheses or new parameter
+        if ($this->getConfig('find_enabled')) {
+            $path      = $path ?: base_path();
+            $keys      = [];
+            $functions = ['trans', 'trans_choice', 'Lang::get', 'Lang::choice', 'Lang::trans', 'Lang::transChoice', '@lang', '@choice', '__'];
+            $pattern   =                              // See http://regexr.com/392hu
+                "[^\w|>]" .                          // Must not have an alphanum or _ or > before real method
+                "(" . implode('|', $functions) . ")" .  // Must start with one of the functions
+                "\(" .                               // Match opening parenthese
+                "[\'\"]" .                           // Match " or '
+                "(" .                                // Start a new group to match:
+                "[a-zA-Z0-9_-]+" .               // Must start with group
+                "([.][^\1)]+)+" .                // Be followed by one or more items/keys
+                ")" .                                // Close group
+                "[\'\"]" .                           // Closing quote
+                "[\),]";                            // Close parentheses or new parameter
 
-        // Find all PHP + Twig files in the app folder, except for storage
-        $finder = new Finder();
-        $finder->in($path)->exclude('storage')->name('*.php')->name('*.twig')->files();
+            // Find all PHP + Twig files in the app folder, except for storage
+            $finder = new Finder();
+            $finder->in($path)->exclude('storage')->name('*.php')->name('*.twig')->files();
 
-        /** @var \Symfony\Component\Finder\SplFileInfo $file */
-        foreach ($finder as $file) {
-            // Search the current file for the pattern
-            if(preg_match_all("/$pattern/siU", $file->getContents(), $matches)) {
-                // Get all matches
-                foreach ($matches[2] as $key) {
-                    $keys[] = $key;
+            /** @var \Symfony\Component\Finder\SplFileInfo $file */
+            foreach ($finder as $file) {
+                // Search the current file for the pattern
+                if (preg_match_all("/$pattern/siU", $file->getContents(), $matches)) {
+                    // Get all matches
+                    foreach ($matches[2] as $key) {
+                        $keys[] = $key;
+                    }
                 }
             }
-        }
-        // Remove duplicates
-        $keys = array_unique($keys);
+            // Remove duplicates
+            $keys = array_unique($keys);
 
-        // Add the translations to the database, if not existing.
-        foreach($keys as $key){
-            // Split the group and item
-            list($group, $item) = explode('.', $key, 2);
-            $this->missingKey('', $group, $item);
-        }
+            // Add the translations to the database, if not existing.
+            foreach ($keys as $key) {
+                // Split the group and item
+                list($group, $item) = explode('.', $key, 2);
+                $this->missingKey('', $group, $item);
+            }
 
-        // Return the number of found translations
-        return count($keys);
+            // Return the number of found translations
+            return count($keys);
+        }
     }
 
     public function exportTranslations($group)
