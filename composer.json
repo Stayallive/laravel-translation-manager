@@ -7,6 +7,10 @@
         {
             "name": "Barry vd. Heuvel",
             "email": "barryvdh@gmail.com"
+        },
+        {
+            "name": "Joris v. Willigen",
+            "email": "me@jorisvanw.me"
         }
     ],
     "require": {
@@ -22,7 +26,12 @@
     },
     "extra": {
         "branch-alias": {
-            "dev-master": "0.2-dev"
+            "dev-master": "0.4-dev"
+        },
+        "laravel": {
+            "providers": [
+                "Barryvdh\\TranslationManager\\TranslationServiceProvider"
+            ]
         }
     },
     "minimum-stability": "stable"
